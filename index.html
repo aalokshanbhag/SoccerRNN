@@ -1,0 +1,201 @@
+<!DOCTYPE html>
+<html lang="en"><head>  
+  <meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+  <meta charset="utf-8">
+  <title>Deep Learning Class Project
+  | Georgia Tech | Fall 2018: CS 4803 / 7643</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="">
+  <meta name="author" content="">
+
+<!-- Le styles -->  
+  <link href="css/bootstrap.css" rel="stylesheet">
+<style>
+body {
+padding-top: 60px; /* 60px to make the container go all the way to the bottom of the topbar */
+}
+.vis {
+color: #3366CC;
+}
+.data {
+color: #FF9900;
+}
+</style>
+  
+<link href="css/bootstrap-responsive.min.css" rel="stylesheet">
+</head>
+
+<body>
+<div class="container">
+<div class="page-header">
+
+<!-- Title and Name --> 
+<h1>SocceRNN</h1> 
+<span style="font-size: 20px; line-height: 1.5em;"><strong>Aalok Shanbhag</strong></span><br>
+<span style="font-size: 20px; line-height: 1.5em;"><strong>Vishwas Uppoor</strong></span><br>
+
+<span style="font-size: 18px; line-height: 1.5em;">Fall 2018 CS 4803 / 7643 Deep Learning: Class Project</span><br>
+<span style="font-size: 18px; line-height: 1.5em;">Georgia Tech</span>
+<hr>
+
+
+
+<!-- Goal -->
+<h2>Abstract</h2>
+<p>RNNs are good at modelling sequential data and videos are a great source of labelled sequential data. In this project, we try to see if deep learning models can learn from soccer videos and be able to predict future video frames given a sequence of previous frames. Many works related to future frame predictions try to predict future frames in natural settings like people interacting, vehicle movement on roads etc. By training our network specifically on soccer videos, we hope that our network could also learn the inherent mechanics of the game like players shouldn't go out of the field, soccer ball should be passed between the players etc. To test our hypothesis that game mechanics can be learnt, we first used player and ball position data to train a network that predicted future positions and after evaluating the results, we trained a network that would predict future video frames from previous frames.</p>
+<br><br>
+<!-- figure -->
+<h2>Architecture</h2>
+
+<p> The architecture we use is henceforth refered to as SoccerRNN. It is same as the well known CharRNN but adapted for Soccer frame data as input instead of text characters. </p>
+Image Reference: Karpathy's <a href="http://karpathy.github.io/2015/05/21/rnn-effectiveness/"> blog </a>.
+<br><br>
+<!-- Main Illustrative Figure --> 
+<div style="text-align: center;">
+<img style="height: 400px;" alt="" src="images/charrnn.jpeg">
+</div>
+
+<br><br>
+<!-- Introduction -->
+<h2>Introduction / Background / Motivation</h2>
+<p>During a game, it is easy for people to anticipate what players are going to do. Even without knowing the rules and objectives of the game, we can get a gist of the game which tells us what the players might try to do given a situation. Similarly, we think that the videos contain enough information that the network can pick up the basic interactions happening in the game and hence, given a sequence of frames, it should be able to predict a reasonable future frame.</p>
+
+<p>There are many works which try to predict the future frames from previous frames, but the focus is generic as in they are used in an unconstrained settings like human interactions. We hope that by training on soccer games, our model will learn to not only model how humans and objects move and interact, but also learn domain specific interactions. Most of the current works use RNNs like LSTM or generative models like GAN to model behaviors.</p>
+
+<p>Currently, various modelling techniques are used in soccer analysis. But the player interactions and predictions are mainly done by experts. Future frame predictions can be used to simulate various outcomes of a given state of play. It can be used by game analysts to simulate how different teams would play under diffrent conditions.</p>
+
+<br><br>
+<!-- Approach -->
+<h2>Approach</h2>
+
+<p> We used two different approaches to test our model,that predicted the future in terms of game sequences. </p>
+
+<p>In the first approach, we train on sequences of player and ball positions obtained from the STATS dataset (dataset used in the paper 'Coordinated Multi-Agent Imitation Learning'). This data is protected by an NDA and available on request.The data consists of attacking play sequences.Each sequence is a matrix (numpy 2D array)with 46 columns. Each row contains 23 pairs of (x,y) coordinates of 22 players from both teams and the bamm at 10Hz. The data is normalized to the dimensions of the field. The players' identity is consistent across sequences. </p>
+
+<p>The input to our SoccerRNN was a sequence of 50 vectors of length 46, amounting to 5 seconds of action. This method gave good results in next frame prediction but not so great when we generated sequences. The sequences were reasonable in the sense that all trajectories were continuous and within the bounds of the field, but the ball would change direction without any player in the vicinity. To correct this, we tried to incorporate some of the intuition from [3] and added ball-player distance information to the input. So now our vector is of length 68. The distance metric was constructed to give higher priority to players closer to the ball. We played around with the metric but we were unable to solve the problem. We also tried using fully connected networks for the same task. As expected, the LSTM architecture outperformed the basic 2 and 3 layer networks we tried. We didn't go deeper as the performance of both was similar and we hit a plateau in performance.</p>
+
+<p>In the second approach, the model is trained on RESNET features of soccer video frames obtained from SOCCERNET dataset(https://silviogiancola.github.io/SoccerNet/). Each file in the dataset is a 5400 x 512 matrix and represents one half of a game where each row corresponds to 0.5 seconds of a game(5400=45*60/0.5). The dataset consists of compressed features wherein the RESNET features of all frames corresponding to 0.5 seconds of game play are concatenated and are compressed to a 512 length vector using PCA. We used 80 soccer matches as training data and tested on 20 matches.</p>
+
+<p>We used an LSTM and trained it on chunks of 20 feature vectors i.e. 10 seconds of game data. We used a fully connected layer at the end to output the frames in the same dimension as the input. The reason for using 10 seconds of data was that on average about 10 seconds of game sequence are covered in a single video shot. The reasoning for using LSTMs is that they are good at modelling long sequences. One risky assumption we made was that the RESNET features would encode player and ball positions. Since we got reasonable predictions for the positions data model, we hoped that the network would also give reasonable predictions for the video frames. </p>
+
+<p>The most important assumption we made was also the most delicate part of our project that the 512 length RESNET feature vector could encode relation between the ground, the players and the soccer ball. Our thinking was that if the assumption was true, then the LSTM could recognize the patterns in which player and ball positions changed wih respect to the stationary ground effectively learning the mechanics of the game. Another problem was our assumption that we were training on continuous shots of videos of 10 seconds. Since we train on consecutive chunks of 10 seconds each, there could be many non-related sequences. We tried to address this by training on chunks of different lengths. Another issue was that in the videos, usually the consecutive frames are closely related, so we anticipated that our model would not learn anything significant since we were using MSE loss between the feature vectors. To mitigate this issue, we also tried to train the LSTM on frames further in the future and not just on the next frames.</p>
+
+<br><br>
+<!-- Results -->
+<h2>Experiments and Results</h2>
+
+
+<p>For the first approach using position data, we measured success using both MSE Loss and qualitatively, by looking at how realistic the generated sequences were. Sequences of length 50 (5 seconds of action) were generated by giving the model the starting frame. SoccerRNN outperformed the fully connected model, and no palpable improvement was obtained by incorporating the ball-player distance metric in the generated sequence.Additionally, the next frame prediction performance decreased when we used the distance metric.It's possible that the size of our training data (~67 Mb, 371,250 frames or 7425 sequences of 50 frames each) may have been insufficient for the model to learn complicated ball-player interactions. Alternatively, a more complex model that accounted for ball-player proximity and also considered changes of angle in the ball trajectory might have done better. That will be considered in future work. The next frame predictions and generated sequences using the standard SoccerRNN model, the augmented Soccer RNN model and a three layer FC network are shared below. Also included are the test-train loss decay curves. Note that the test loss is lower than train loss initially as it's being computed after the completion of an entire epoch of training.  </p>
+
+<p> The best results for SoccerRNN were obtained using a hidden layer size of 500,4 stacked LSTMS and learning rate of 0.001 with an Adam optimizer. We didn't try and optimize other hyperparameters. The same architecture was used for SoccerRNN with ball distance data. The three layer FC NN had layer sizes of 100 and 50.</p>
+
+
+<p>In the second part, during testing, we fed the actual current frame and evaluated the predicted frame over a sequence of 20 frames. We calculated the nearest neighbour for every predicted frame within the same match of the test data. A prediction is considered succesful if the nearest neighbour of the prediction is within the next 5 frames from the current frame. Even though most of the predictions still had the current frame as the nearest neighbour, upto 20% of the predicted frames had one of the next 5 frames as the nearest neighbour. Our original plan was to validate our experiments with a classifier which would detect and classify game events like goals, substitutions, cards etc on the predicted frames. But we were not able to achieve desired accuracies on the classifiers to use them to validate our results. We also tested our model by training it on next to next and also on 3rd next frame to check if the network was learning anything at all. Surprisingly, training with +2 and +3 frames gave better accuracy than training on the very next frame. But in all the cases, the testing accuracy marginally improved if it improved at all. We used different architectures with hidden sizes ranging from 256 to 2048, and also used a single LSTM to 10 stacked LSTMs, but more complex models only improved the training accuracy suggesting overfit of data. We also varied the training sequence length, but that did not seem to have an effect on the results. Since, the model did not perform well when actual frames are given as input, we did not try to use the generated sequences inputs. The below plot shows the training and testing accuracies for our model trained on +1, +2 and +3 frames respectively.</p>
+
+<p>Even though the results are not very good, at least 15% of the predictions being closer to the future frames shows that with a good enough model, well defined objective and using better input features, it could be done. It should be noted that chance accuracy using the above metrics would be about 0.09%. </p>
+
+<br><br>
+
+
+<h3> Positional Data Approach Results for Part A</h3>
+
+
+<table border=1>
+<tr>
+<td>
+<figure>
+<img style="height: 225px; "src="images/actual.gif" width="80%"/>
+<figcaption><em>Actual sequence</em></figcaption>
+</figure>
+</td>
+</tr>
+</table>
+
+<table border=1>
+<tr>
+<th>Fully Connected NN</th>
+<th>SoccerRNN with position data</th>
+<th>SoccerRNN with position and distance</th>
+</tr>
+<tr>
+<td>
+<img style="height: 225px; "src="images/loss_fc_nn.png" width="100%"/>
+</td>
+<td>
+<img style="height: 225px;"src="images/loss_snet.png" width="100%"/>
+</td>
+<td>
+<img style="height: 225px; "src="images/loss_snet_dist.png" width="100%"/>
+</td>
+</tr>
+</table>
+
+
+<table border=1>
+<tr>
+<td>
+<figure>
+<img style="height: 225px; "src="images/fc_gen.gif" width="33%"/>
+<img style="height: 225px;"src="images/snet_gen.gif" width="33%"/>
+<img style="height: 225px; "src="images/snet_dist_gen.gif" width="33%"/>
+<figcaption><em>Generated sequence</em></figcaption>
+</figure>
+</td>
+</tr>
+</table>
+
+<table border=1>
+<tr>
+<td>
+<figure>
+<img style="height: 225px; "src="images/fc_nf.gif" width="33%"/>
+<img style="height: 225px;"src="images/snet_nf.gif" width="33%"/>
+<img style="height: 225px; "src="images/snet_dist_nf.gif" width="33%"/>
+<figcaption><em>Next Frame Prediction</em></figcaption>
+</figure>
+</td>
+</tr>
+</table>
+
+<br><br>
+
+<h3> Results for Part B</h3>
+
+<table border=1>
+<tr>
+<th>Frame difference 1</th>
+<th>Frame difference 2</th>
+<th>Frame difference 3</th>
+</tr>
+<tr>
+<td>
+<img style="height: 225px; "src="images/fd1.png" width="100%"/>
+</td>
+<td>
+<img style="height: 225px;"src="images/fd2.png" width="100%"/>
+</td>
+<td>
+<img style="height: 225px; "src="images/fd3.png" width="100%"/>
+</td>
+</tr>
+</table>
+
+
+<h2>References:</h2>
+<ol>
+<li>https://github.com/karpathy/char-rnn </li>
+<li>https://github.com/spro/char-rnn.pytorch </li>
+<li> M.B. Chang, T. Ullman, A. Torralba, J.B. Tenenbaum, A compositional object-based approach to learning physical dynamics, 2016, [online] Available: https://arXiv:1612.00341. </li>
+</ol>
+<br><br>
+
+  <hr>
+  <footer> 
+  <p>© Aalok Shanbhag, Vishwas Uppoor </p>
+  </footer>
+</div>
+</div>
+
+<br><br>
+
+</body></html>
